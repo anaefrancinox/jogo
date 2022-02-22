@@ -52,6 +52,4 @@ io.on("connection", function (socket) {
 
 // Dois tipos de cliente: com Phaser 3 e com Twine
 app.use("/", express.static("./cliente"));
-
-
 server.listen(PORT, () => console.log(`Server listening on port ${PORT}!`));
