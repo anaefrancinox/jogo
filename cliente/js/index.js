@@ -2,12 +2,20 @@ var config = {
   type: Phaser.AUTO,
   width: 800,
   height: 600,
+  parent: "game-container",
   physics: {
     default: "arcade",
     arcade: {
       gravity: { y: 300 },
-      debug: false,
+      debug: true,
     },
+  },
+  scale: {
+    mode: Phaser.Scale.FIT,
+    parent: "game-container",
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 800,
+    height: 600,
   },
   scene: {
     preload: preload,
@@ -16,7 +24,8 @@ var config = {
   },
 };
 
-var player;
+var player1;
+var player2;
 var stars;
 var bombs;
 var platforms;
@@ -25,6 +34,11 @@ var score = 0;
 var gameOver = false;
 var scoreText;
 var jogador;
+var ice_servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+var localConnection;
+var remoteConnection;
+var midias;
+const audio = document.querySelector("audio");
 var game = new Phaser.Game(config);
 
 function preload() {
@@ -32,7 +46,11 @@ function preload() {
   this.load.image("ground", "assets/platform.png");
   this.load.image("star", "assets/star.png");
   this.load.image("bomb", "assets/bomb.png");
-  this.load.spritesheet("dude", "assets/dude.png", {
+  this.load.spritesheet("player1", "assets/dude.png", {
+    frameWidth: 45,
+    frameHeight: 38,
+  });
+  this.load.spritesheet("player2", "assets/dude.png", {
     frameWidth: 45,
     frameHeight: 38,
   });
@@ -55,29 +73,68 @@ function create() {
   platforms.create(750, 220, "ground");
 
   // The player and its settings
-  player = this.physics.add.sprite(100, 450, "dude");
+  player1 = this.physics.add.sprite(100, 450, "player1");
+  player1.body.setAllowGravity(false);
 
-  //  Player physics properties. Give the little guy a slight bounce.
-  player.setBounce(0.2);
-  player.setCollideWorldBounds(true);
-
-  //  Our player animations, turning, walking left and walking right.
   this.anims.create({
-    key: "left",
-    frames: this.anims.generateFrameNumbers("dude", { start: 8, end: 9 }),
+    key: "left1",
+    frames: this.anims.generateFrameNumbers("player1", {
+      start: 8,
+      end: 9,
+    }),
     frameRate: 10,
     repeat: -1,
   });
 
   this.anims.create({
-    key: "turn",
-    frames: [{ key: "dude", start: 1, end: 1 }],
-    frameRate: 20,
+    key: "turn1",
+    frames: this.anims.generateFrameNumbers("player1", {
+      start: 0,
+      end: 1,
+    }),
+    frameRate: 2,
+    repeat: -1,
   });
 
   this.anims.create({
-    key: "right",
-    frames: this.anims.generateFrameNumbers("dude", { start: 18, end: 19 }),
+    key: "right1",
+    frames: this.anims.generateFrameNumbers("player1", {
+      start: 18,
+      end: 19,
+    }),
+    frameRate: 10,
+    repeat: 1,
+  });
+
+  player2 = this.physics.add.sprite(100, 450, "player2");
+  player2.body.setAllowGravity(false);
+
+  this.anims.create({
+    key: "left2",
+    frames: this.anims.generateFrameNumbers("player2", {
+      start: 8,
+      end: 9,
+    }),
+    frameRate: 10,
+    repeat: -1,
+  });
+
+  this.anims.create({
+    key: "turn2",
+    frames: this.anims.generateFrameNumbers("player2", {
+      start: 0,
+      end: 1,
+    }),
+    frameRate: 2,
+    repeat: -1,
+  });
+
+  this.anims.create({
+    key: "right2",
+    frames: this.anims.generateFrameNumbers("player2", {
+      start: 18,
+      end: 19,
+    }),
     frameRate: 10,
     repeat: 1,
   });
@@ -97,26 +154,20 @@ function create() {
     child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
   });
 
-  bombs = this.physics.add.group();
-
-  //  The score
   scoreText = this.add.text(16, 16, "score: 0", {
     fontSize: "32px",
     fill: "#000",
   });
 
-  //  Collide the player and the stars with the platforms
-  this.physics.add.collider(player, platforms);
-  this.physics.add.collider(stars, platforms);
-  this.physics.add.collider(bombs, platforms);
+  this.physics.add.collider(stars, platforms, null, null, this);
 
-  //  Checks to see if the player overlaps with any of the stars, if he does call the collectStar function
-  this.physics.add.overlap(player, stars, collectStar, null, this);
-
-  this.physics.add.collider(player, bombs, hitBomb, null, this);
-
+  // Conectar no servidor via WebSocket
   this.socket = io();
+
+  // Disparar evento quando jogador entrar na partida
   var self = this;
+  var physics = this.physics;
+  var socket = this.socket;
 
   this.socket.on("jogadores", function (jogadores) {
     if (jogadores.primeiro === self.socket.id) {
@@ -124,76 +175,11 @@ function create() {
       jogador = 1;
 
       // Personagens colidem com os limites da cena
+      player1.body.setAllowGravity(true);
+      physics.add.collider(player1, platforms);
+      physics.add.collider(stars, platforms);
+      physics.add.overlap(player1, stars, collectStar, null, this);
       player1.setCollideWorldBounds(true);
-
-      // Detecção de colisão: terreno
-      physics.add.collider(player1, terreno, hitCave, null, this);
-
-      // Detecção de colisão e disparo de evento: ARCas
-      physics.add.collider(player1, ARCas, hitARCa, null, this);
-
-      // Câmera seguindo o personagem 1
-      cameras.main.startFollow(player1);
-
-      // D-pad: para cada direção já os eventos
-      // para tocar a tela ("pointerover")
-      // e ao terminar essa interação ("pointerout")
-      esquerda.on("pointerover", () => {
-        if (timer > 0) {
-          esquerda.setFrame(1);
-          player1.setVelocityX(-160);
-          player1.anims.play("left1", true);
-        }
-      });
-      esquerda.on("pointerout", () => {
-        if (timer > 0) {
-          esquerda.setFrame(0);
-          player1.setVelocityX(0);
-          player1.anims.play("stopped1", true);
-        }
-      });
-      direita.on("pointerover", () => {
-        if (timer > 0) {
-          direita.setFrame(1);
-          player1.setVelocityX(160);
-          player1.anims.play("right1", true);
-        }
-      });
-      direita.on("pointerout", () => {
-        if (timer > 0) {
-          direita.setFrame(0);
-          player1.setVelocityX(0);
-          player1.anims.play("stopped1", true);
-        }
-      });
-      cima.on("pointerover", () => {
-        if (timer > 0) {
-          cima.setFrame(1);
-          player1.setVelocityY(-160);
-          player1.anims.play("right1", true);
-        }
-      });
-      cima.on("pointerout", () => {
-        if (timer > 0) {
-          cima.setFrame(0);
-          player1.setVelocityY(0);
-          player1.anims.play("stopped1", true);
-        }
-      });
-      baixo.on("pointerover", () => {
-        if (timer > 0) {
-          baixo.setFrame(1);
-          player1.setVelocityY(160);
-          player1.anims.play("right1", true);
-        }
-      });
-      baixo.on("pointerout", () => {
-        if (timer > 0) {
-          baixo.setFrame(0);
-          player1.setVelocityY(0);
-          player1.anims.play("stopped1", true);
-        }
-      });
 
       navigator.mediaDevices
         .getUserMedia({ video: false, audio: true })
@@ -206,76 +192,10 @@ function create() {
       jogador = 2;
 
       // Personagens colidem com os limites da cena
+      player2.body.setAllowGravity(true);
+      physics.add.collider(player2, platforms);
+      physics.add.overlap(player2, stars, collectStar, null, this);
       player2.setCollideWorldBounds(true);
-
-      // Detecção de colisão: terreno
-      physics.add.collider(player2, terreno, hitCave, null, this);
-
-      // Detecção de colisão e disparo de evento: ARCas
-      physics.add.collider(player2, ARCas, hitARCa, null, this);
-
-      // Câmera seguindo o personagem 2
-      cameras.main.startFollow(player2);
-
-      // D-pad: para cada direção já os eventos
-      // para tocar a tela ("pointerover")
-      // e ao terminar essa interação ("pointerout")
-      esquerda.on("pointerover", () => {
-        if (timer > 0) {
-          esquerda.setFrame(1);
-          player2.setVelocityX(-160);
-          player2.anims.play("left2", true);
-        }
-      });
-      esquerda.on("pointerout", () => {
-        if (timer > 0) {
-          esquerda.setFrame(0);
-          player2.setVelocityX(0);
-          player2.anims.play("stopped2", true);
-        }
-      });
-      direita.on("pointerover", () => {
-        if (timer > 0) {
-          direita.setFrame(1);
-          player2.setVelocityX(160);
-          player2.anims.play("right2", true);
-        }
-      });
-      direita.on("pointerout", () => {
-        if (timer > 0) {
-          direita.setFrame(0);
-          player2.setVelocityX(0);
-          player2.anims.play("stopped2", true);
-        }
-      });
-      cima.on("pointerover", () => {
-        if (timer > 0) {
-          cima.setFrame(1);
-          player2.setVelocityY(-160);
-          player2.anims.play("right2", true);
-        }
-      });
-      cima.on("pointerout", () => {
-        if (timer > 0) {
-          cima.setFrame(0);
-          player2.setVelocityY(0);
-          player2.anims.play("stopped2", true);
-        }
-      });
-      baixo.on("pointerover", () => {
-        if (timer > 0) {
-          baixo.setFrame(1);
-          player2.setVelocityY(160);
-          player2.anims.play("right2", true);
-        }
-      });
-      baixo.on("pointerout", () => {
-        if (timer > 0) {
-          baixo.setFrame(0);
-          player2.setVelocityY(0);
-          player2.anims.play("stopped2", true);
-        }
-      });
 
       navigator.mediaDevices
         .getUserMedia({ video: false, audio: true })
@@ -309,16 +229,6 @@ function create() {
 
     // Os dois jogadores estão conectados
     console.log(jogadores);
-    if (jogadores.primeiro !== undefined && jogadores.segundo !== undefined) {
-      // Contagem regressiva em segundos (1.000 milissegundos)
-      timer = 60;
-      timedEvent = time.addEvent({
-        delay: 1000,
-        callback: countdown,
-        callbackScope: this,
-        loop: true,
-      });
-    }
   });
 
   this.socket.on("offer", (socketId, description) => {
@@ -369,22 +279,44 @@ function update() {
     return;
   }
 
-  if (cursors.left.isDown) {
-    player.setVelocityX(-160);
-
-    player.anims.play("left", true);
-  } else if (cursors.right.isDown) {
-    player.setVelocityX(160);
-
-    player.anims.play("right", true);
-  } else {
-    player.setVelocityX(0);
-
-    player.anims.play("turn");
-  }
-
-  if (cursors.up.isDown && player.body.touching.down) {
-    player.setVelocityY(-330);
+  if (jogador === 1) {
+    if (cursors.left.isDown) {
+      player1.setVelocityX(-160);
+      player1.anims.play("left1", true);
+    } else if (cursors.right.isDown) {
+      player1.setVelocityX(160);
+      player1.anims.play("right1", true);
+    } else {
+      player1.setVelocityX(0);
+      player1.anims.play("turn1");
+    }
+    if (cursors.up.isDown && player1.body.touching.down) {
+      player1.setVelocityY(-330);
+    }
+    this.socket.emit("estadoDoJogador", {
+      frame: player1.anims.getFrameName(),
+      x: player1.body.x + 20,
+      y: player1.body.y + 20,
+    });
+  } else if (jogador === 2) {
+    if (cursors.left.isDown) {
+      player2.setVelocityX(-160);
+      player2.anims.play("left2", true);
+    } else if (cursors.right.isDown) {
+      player2.setVelocityX(160);
+      player2.anims.play("right2", true);
+    } else {
+      player2.setVelocityX(0);
+      player2.anims.play("turn2");
+    }
+    if (cursors.up.isDown && player2.body.touching.down) {
+      player2.setVelocityY(-330);
+    }
+    this.socket.emit("estadoDoJogador", {
+      frame: player2.anims.getFrameName(),
+      x: player2.body.x + 20,
+      y: player2.body.y + 20,
+    });
   }
 }
 
@@ -400,26 +332,5 @@ function collectStar(player, star) {
     stars.children.iterate(function (child) {
       child.enableBody(true, child.x, 0, true, true);
     });
-
-    var x =
-      player.x < 400
-        ? Phaser.Math.Between(400, 800)
-        : Phaser.Math.Between(0, 400);
-
-    var bomb = bombs.create(x, 16, "bomb");
-    bomb.setBounce(1);
-    bomb.setCollideWorldBounds(true);
-    bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
-    bomb.allowGravity = false;
   }
-}
-
-function hitBomb(player, bomb) {
-  this.physics.pause();
-
-  player.setTint(0xff0000);
-
-  player.anims.play("turn");
-
-  gameOver = true;
 }
