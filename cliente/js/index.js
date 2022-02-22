@@ -50,7 +50,7 @@ function preload() {
     frameWidth: 45,
     frameHeight: 38,
   });
-  this.load.spritesheet("player2", "assets/dude.png", {
+  this.load.spritesheet("player2", "assets/dude2.png", {
     frameWidth: 45,
     frameHeight: 38,
   });
