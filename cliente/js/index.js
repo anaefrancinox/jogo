@@ -63,7 +63,6 @@ function create() {
   this.add.image(400, 300, "sky");
   trilha = this.sound.add("trilha");
   trilha.play();
-  
 
   //  The platforms group contains the ground and the 2 ledges we can jump on
   platforms = this.physics.add.staticGroup();
@@ -143,21 +142,9 @@ function create() {
     frameRate: 10,
     repeat: 1,
   });
+
   bombs = this.physics.add.group();
-
   this.physics.add.collider(bombs, platforms);
-
-  this.physics.add.collider(player, bombs, hitBomb, null, this);
-  function hitBomb(player, bomb) {
-    this.physics.pause();
-
-    player.setTint(0xff0000);
-
-    player.anims.play("turn");
-
-    gameOver = true;
-  }
-  
 
   //  Input Events
   cursors = this.input.keyboard.createCursorKeys();
@@ -199,6 +186,7 @@ function create() {
       physics.add.collider(player1, platforms);
       physics.add.collider(stars, platforms);
       physics.add.overlap(player1, stars, collectStar, null, this);
+      physics.add.collider(player1, bombs, hitBomb, null, this);
       player1.setCollideWorldBounds(true);
 
       navigator.mediaDevices
@@ -215,6 +203,7 @@ function create() {
       player2.body.setAllowGravity(true);
       physics.add.collider(player2, platforms);
       physics.add.overlap(player2, stars, collectStar, null, this);
+      physics.add.collider(player2, bombs, hitBomb, null, this);
       player2.setCollideWorldBounds(true);
 
       navigator.mediaDevices
@@ -296,6 +285,9 @@ function create() {
 
 function update() {
   if (gameOver) {
+    if (jogador === 1) player1.anims.play("turn1");
+    else if (jogador === 2) player2.anims.play("turn2");
+    this.physics.pause();
     return;
   }
 
@@ -352,13 +344,21 @@ function collectStar(player, star) {
     stars.children.iterate(function (child) {
       child.enableBody(true, child.x, 0, true, true);
     });
-       var x =
-         player.x < 400
-           ? Phaser.Math.Between(400, 800)
-           : Phaser.Math.Between(0, 400);
 
-       var bomb = bombs.create(x, 16, "bomb");
-       bomb.setBounce(1);
-       bomb.setCollideW;
+    var x =
+      player.x < 400
+        ? Phaser.Math.Between(400, 800)
+        : Phaser.Math.Between(0, 400);
+
+    var bomb = bombs.create(x, 16, "bomb");
+    bomb.setBounce(1);
+    bomb.setCollideWorldBounds(true);
+    bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+    bomb.allowGravity = false;
   }
+}
+
+function hitBomb(player, bomb) {
+  player.setTint(0xff0000);
+  gameOver = true;
 }
