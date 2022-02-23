@@ -38,6 +38,7 @@ var ice_servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 var localConnection;
 var remoteConnection;
 var midias;
+var trilha;
 const audio = document.querySelector("audio");
 var game = new Phaser.Game(config);
 
@@ -46,6 +47,7 @@ function preload() {
   this.load.image("ground", "assets/platform.png");
   this.load.image("star", "assets/star.png");
   this.load.image("bomb", "assets/bomb.png");
+  this.load.audio("trilha", "./assets/cena1.mp3");
   this.load.spritesheet("player1", "assets/dude.png", {
     frameWidth: 45,
     frameHeight: 38,
@@ -59,6 +61,8 @@ function preload() {
 function create() {
   //  A simple background for our game
   this.add.image(400, 300, "sky");
+  trilha = this.sound.add("trilha");
+  trilha.play();
 
   //  The platforms group contains the ground and the 2 ledges we can jump on
   platforms = this.physics.add.staticGroup();
