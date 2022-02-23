@@ -63,6 +63,7 @@ function create() {
   this.add.image(400, 300, "sky");
   trilha = this.sound.add("trilha");
   trilha.play();
+  
 
   //  The platforms group contains the ground and the 2 ledges we can jump on
   platforms = this.physics.add.staticGroup();
@@ -142,6 +143,21 @@ function create() {
     frameRate: 10,
     repeat: 1,
   });
+  bombs = this.physics.add.group();
+
+  this.physics.add.collider(bombs, platforms);
+
+  this.physics.add.collider(player, bombs, hitBomb, null, this);
+  function hitBomb(player, bomb) {
+    this.physics.pause();
+
+    player.setTint(0xff0000);
+
+    player.anims.play("turn");
+
+    gameOver = true;
+  }
+  
 
   //  Input Events
   cursors = this.input.keyboard.createCursorKeys();
@@ -336,5 +352,13 @@ function collectStar(player, star) {
     stars.children.iterate(function (child) {
       child.enableBody(true, child.x, 0, true, true);
     });
+       var x =
+         player.x < 400
+           ? Phaser.Math.Between(400, 800)
+           : Phaser.Math.Between(0, 400);
+
+       var bomb = bombs.create(x, 16, "bomb");
+       bomb.setBounce(1);
+       bomb.setCollideW;
   }
 }
